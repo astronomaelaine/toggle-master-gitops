@@ -1,60 +1,67 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
-  name: evaluation-service
-  namespace: toggle-master
+  name: {{ .Values.app.name }}
+  namespace: {{ .Values.namespace }}
   labels:
-    app: evaluation-service
+    app: {{ .Values.app.name }}
+
 spec:
-  replicas: 2
+  replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
-      app: evaluation-service
+      app: {{ .Values.app.name }}
+
   template:
     metadata:
       labels:
-        app: evaluation-service
+        app: {{ .Values.app.name }}
+
     spec:
       containers:
-      - name: evaluation-service
-        image: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/evaluation-service:v1.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8004
-        
-        envFrom:
-        - configMapRef:
-            name: evaluation-service-config
-        
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8004
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8004
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 5
-          failureThreshold: 2
-        
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 8004
-          failureThreshold: 30
-          periodSeconds: 5
+        - name: {{ .Values.app.name }}
 
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.service.port }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.configMap.name }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: {{ .Values.service.port }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
