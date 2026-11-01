@@ -1,29 +1,36 @@
 # toggle-master-gitops
 
-GitOps existente do ToggleMaster. O ApplicationSet em `argocd/applicationset.yaml`
-acompanha a branch `master` e inclui platform, auth-service, flag-service,
+GitOps do ToggleMaster. O ApplicationSet em `argocd/applicationset.yaml`
+acompanha `master` e inclui platform, auth-service, flag-service,
 targeting-service, evaluation-service e analytics-service.
 
 ## Imagens publicadas pelo CI
 
-Os workflows dos microsserviços autenticam no ECR com o secret
-`AWS_ACADEMY_CREDENTIALS` configurado em cada repositório. Depois do push da
-imagem, usam o secret `GITOPS_DEPLOY_KEY` para atualizar os campos
-`image.repository` e `image.tag` de `apps/<serviço>/values.yaml` neste repositório.
+As esteiras publicam as imagens no ECR e atualizam `image.repository` e
+`image.tag` em `apps/<serviço>/values.yaml`. Todos os Deployments, incluindo
+analytics-service, usam esses campos e `image.pullPolicy`.
 
-A imagem e a política de pull dos Deployments usam esses valores, incluindo
-analytics-service. Os valores iniciais de analytics refletem a referência que
-já estava no seu Deployment; o primeiro pipeline aprovado os substituirá pelo
-endereço real do ECR Academy e pela tag publicada.
+Os valores versionados devem corresponder a imagens já publicadas. A validação
+do chart usa um endereço fictício e uma tag de teste somente durante a renderização.
 
-Os pipelines fazem rebase e repetem até três tentativas de push para acomodar
-atualizações concorrentes de serviços diferentes, sem force push. Uma falha de
-merge permanece visível no job e não é sobrescrita à força.
+Os workflows de publicação utilizam `AWS_ACADEMY_CREDENTIALS` e
+`GITOPS_DEPLOY_KEY`, configurados nos repositórios dos microsserviços.
+Atualizações concorrentes no GitOps devem passar por rebase e repetição do push.
+
+## Configuração de execução
+
+Os templates referenciam os Secrets `academy-databases` e `academy-runtime`.
+Eles precisam existir no namespace de destino antes de os serviços iniciarem.
+Os valores privados de conexão e autenticação são fornecidos no cluster.
+
+Os parâmetros Helm `academyConfigRevision` e `academyAwsRevision` permitem
+provocar rollout quando a configuração externa muda. O ApplicationSet preserva
+as réplicas controladas pelos HPAs de evaluation-service e analytics-service.
 
 ## Validação dos charts
 
-O workflow `validate-charts.yml` executa `helm lint` e renderiza os cinco charts
-de microsserviços com um repositório e tag de teste. A validação confirma que
-a imagem fornecida em `values.yaml` é usada no manifesto renderizado.
-Essa validação trabalha somente com arquivos; o ArgoCD e o acesso ao cluster
-são configurados separadamente.
+O workflow `validate-charts.yml` executa `helm lint` e `helm template`
+para os cinco charts de microsserviços. Cada job fornece um repositório e uma
+tag de teste e verifica se essa imagem aparece no manifesto renderizado.
+
+Os testes validam os arquivos sem acessar o cluster ou publicar imagens.
