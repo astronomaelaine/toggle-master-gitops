@@ -46,12 +46,15 @@ def restart_evaluation():
 
 
 def notify(status, outcome='pending'):
+    if os.environ.get('EXTERNAL_INTEGRATIONS_ENABLED', 'true') == 'false':
+        emit('notification_disabled', status=status, reason='local lab without external integrations')
+        return
     pd_body = {'routing_key': os.environ['PAGERDUTY_ROUTING_KEY'],
                'event_action': 'trigger' if status == 'firing' else 'resolve',
                'dedup_key': DEDUP_KEY}
     if status == 'firing':
         pd_body['payload'] = {'summary': 'ToggleMaster: evaluation com mais de 5% de erros HTTP 5xx',
-                              'source': 'toggle-cluster', 'severity': 'critical',
+                              'source': os.environ.get('CLUSTER_NAME', 'toggle-cluster'), 'severity': 'critical',
                               'component': 'evaluation-service',
                               'custom_details': {'window': '2m', 'pending': '45s',
                                                  'runbook': 'Reiniciar deployment/evaluation-service uma vez; verificar recuperacao.'}}
@@ -59,7 +62,7 @@ def notify(status, outcome='pending'):
         ('pagerduty', 'https://events.pagerduty.com/v2/enqueue', pd_body),
         ('discord', os.environ['DISCORD_WEBHOOK_URL'], {'content': (
             f'**ToggleMaster | {status.upper()}**\n'
-            'Servico: evaluation-service | Cluster: toggle-cluster\n'
+            f"Servico: evaluation-service | Cluster: {os.environ.get('CLUSTER_NAME', 'toggle-cluster')}\n"
             'Regra: erros HTTP 5xx > 5%, janela 2m, pendencia 45s.\n'
             f'Runbook automatico: reiniciar somente evaluation-service. Resultado: {outcome}.\n'
             f'Correlacao do incidente: {DEDUP_KEY}')})]
