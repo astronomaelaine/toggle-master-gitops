@@ -6,6 +6,18 @@ k() { kubectl --context kind-toggle-floci "$@"; }
 curl -fsS http://localhost:3000/api/health >/dev/null
 curl -fsS http://localhost:8080/healthz >/dev/null
 bash "$ROOT/local/lab.sh" demo start
+# Job creation is asynchronous: wait for its Pod before waiting for readiness.
+echo 'Waiting for the demo Job to create its Pod...'
+for ((i=0;i<60;i++)); do
+  pods="$(k -n toggle-master get pods -l job-name=fase4-demo -o name)"
+  if [[ -n "$pods" ]]; then break; fi
+  sleep 2
+done
+if [[ -z "$pods" ]]; then
+  echo 'The demo Job did not create a Pod within 120 seconds.' >&2
+  k -n toggle-master describe job fase4-demo
+  exit 1
+fi
 k -n toggle-master wait --for=condition=Ready pod -l job-name=fase4-demo --timeout=120s
 for ((i=0;i<45;i++)); do
   if k -n toggle-master logs job/fase4-demo | grep -q '"status": 200'; then break; fi
